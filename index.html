@@ -52,7 +52,7 @@ nav button.on{color:var(--accent);font-weight:700;box-shadow:inset 0 3px 0 var(-
 /* 入力 */
 .month-line{display:flex;justify-content:space-between;align-items:baseline;margin:0 0 10px;font-size:13px;color:var(--sub)}
 .month-line b{font-size:15px;color:var(--ink);font-weight:700}
-.seg{display:grid;grid-template-columns:1fr 1fr;background:var(--line);border-radius:12px;padding:3px;gap:3px}
+.seg{display:grid;grid-template-columns:1fr 1fr 1fr;background:var(--line);border-radius:12px;padding:3px;gap:3px}
 .seg button{height:38px;border:0;border-radius:9px;background:transparent;color:var(--sub);font-weight:500;font-size:15px}
 .seg button.on{background:var(--surface);color:var(--ink);font-weight:700}
 .amount{display:flex;justify-content:flex-end;align-items:baseline;gap:6px;padding:12px 4px 8px;border-bottom:2px solid var(--line);margin-bottom:12px}
@@ -92,6 +92,8 @@ nav button.on{color:var(--accent);font-weight:700;box-shadow:inset 0 3px 0 var(-
 .acts{display:flex;gap:8px;padding:10px 14px;border-bottom:1px solid var(--line);background:var(--bg)}
 .acts button{flex:1;height:40px;border-radius:10px;border:1px solid var(--line);background:var(--surface);font-weight:700;font-size:14px}
 .acts .del{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.edit-banner{display:flex;justify-content:space-between;align-items:center;gap:8px;background:var(--surface);border:1px solid var(--accent);color:var(--accent);border-radius:10px;padding:8px 12px;font-size:13px;font-weight:700;margin-bottom:10px}
+.rec-sub{width:100%;height:46px;margin-top:8px;border:1px solid var(--line);border-radius:14px;background:var(--surface);font-size:15px;font-weight:700}
 
 /* まとめ */
 .tot{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px}
@@ -100,6 +102,7 @@ nav button.on{color:var(--accent);font-weight:700;box-shadow:inset 0 3px 0 var(-
 .tot .k{font-size:13px;color:var(--sub)}
 .tot .v{font-size:24px;font-weight:700;margin-top:2px}
 .tot .v.inc{color:var(--income)}
+.tag{display:inline-block;margin-left:6px;padding:1px 7px;border-radius:999px;border:1px solid var(--income);color:var(--income);font-size:11px;font-weight:700;vertical-align:1px}
 .sec-t{margin:0 0 8px;font-size:15px;font-weight:700}
 .bar{margin-bottom:12px}
 .bar-top{display:flex;justify-content:space-between;font-size:14px;margin-bottom:5px}
@@ -135,8 +138,10 @@ nav button.on{color:var(--accent);font-weight:700;box-shadow:inset 0 3px 0 var(-
   var KEY = 'kakeibo:v1';
   var CATS = {
     expense: ['食費','外食','日用品','交通費','通信費','光熱費','住居','医療','趣味・娯楽','その他'],
-    income:  ['給与','副業','その他']
+    income:  ['給与','その他'],
+    side:    ['Uber Eats','SNS・AI','その他']
   };
+  var TYPE_NAME = { expense: '支出', income: '収入', side: '副業収入' };
   var WD = ['日','月','火','水','木','金','土'];
 
   function pad(n){ return (n < 10 ? '0' : '') + n; }
@@ -151,7 +156,13 @@ nav button.on{color:var(--accent);font-weight:700;box-shadow:inset 0 3px 0 var(-
   function load(){
     try {
       var r = localStorage.getItem(KEY);
-      return r ? JSON.parse(r) : [];
+      var list = r ? JSON.parse(r) : [];
+      var changed = false;
+      list.forEach(function(e){
+        if (e.type === 'income' && e.cat === '副業'){ e.type = 'side'; e.cat = 'その他'; changed = true; }
+      });
+      if (changed) localStorage.setItem(KEY, JSON.stringify(list));
+      return list;
     } catch (e) { storageOk = false; return []; }
   }
   function save(){
@@ -168,7 +179,8 @@ nav button.on{color:var(--accent);font-weight:700;box-shadow:inset 0 3px 0 var(-
     memo: '',
     date: todayStr(),
     month: todayStr().slice(0, 7),
-    sel: null
+    sel: null,
+    editId: null
   };
   var toastTimer = null, lastId = null;
 
@@ -195,16 +207,18 @@ nav button.on{color:var(--accent);font-weight:700;box-shadow:inset 0 3px 0 var(-
       return '<button data-k="' + k + '"' + (k === 'del' ? ' aria-label="1文字消す"' : '') + '>' + (k === 'del' ? '⌫' : k) + '</button>';
     }).join('');
     return (storageOk ? '' : '<p class="note">この環境ではデータを保存できません。ページを閉じると記録は消えます。</p>') +
-      '<div class="month-line"><span>' + Number(cm.split('-')[1]) + '月の支出</span><b>' + yen(exp) + '</b></div>' +
+      (S.editId ? '<div class="edit-banner"><span>記録を編集中</span></div>' : '<div class="month-line"><span>' + Number(cm.split('-')[1]) + '月の支出</span><b>' + yen(exp) + '</b></div>') +
       '<div class="seg">' +
         '<button data-type="expense" class="' + (S.type === 'expense' ? 'on' : '') + '">支出</button>' +
         '<button data-type="income" class="' + (S.type === 'income' ? 'on' : '') + '">収入</button>' +
+        '<button data-type="side" class="' + (S.type === 'side' ? 'on' : '') + '">副業</button>' +
       '</div>' +
       '<div class="amount" aria-live="polite"><span class="yen">¥</span><span class="num' + (S.amount === '' ? ' empty' : '') + '">' + amtNum + '</span></div>' +
       '<div class="chips">' + chips + '</div>' +
       '<div class="meta"><input id="memo" type="text" maxlength="40" placeholder="メモ（任意）" value="' + esc(S.memo) + '"><input id="date" type="date" value="' + S.date + '"></div>' +
       '<div class="pad">' + keys + '</div>' +
-      '<button class="rec" data-act="rec"' + (S.amount === '' ? ' disabled' : '') + '>' + (S.type === 'expense' ? '支出' : '収入') + 'を記録</button>';
+      '<button class="rec" data-act="rec"' + (S.amount === '' ? ' disabled' : '') + '>' + (S.editId ? '変更を保存' : TYPE_NAME[S.type] + 'を記録') + '</button>' +
+      (S.editId ? '<button class="rec-sub" data-act="cancel-edit">キャンセル</button>' : '');
   }
 
   function viewHistory(){
@@ -225,11 +239,11 @@ nav button.on{color:var(--accent);font-weight:700;box-shadow:inset 0 3px 0 var(-
       var dayExp = sum(g.items, 'expense');
       html += '<div class="day"><div class="day-h"><span>' + Number(p[1]) + '月' + Number(p[2]) + '日（' + wd + '）</span><span>' + (dayExp ? '支出 ' + yen(dayExp) : '') + '</span></div><div class="list">';
       g.items.forEach(function(e){
-        html += '<button class="row" data-sel="' + e.id + '"><span class="l"><span class="c">' + esc(e.cat) + '</span>' +
+        html += '<button class="row" data-sel="' + e.id + '"><span class="l"><span class="c">' + esc(e.cat) + (e.type === 'side' ? '<span class="tag">副業</span>' : '') + '</span>' +
           (e.memo ? '<div class="m">' + esc(e.memo) + '</div>' : '') + '</span>' +
-          '<span class="a' + (e.type === 'income' ? ' inc' : '') + '">' + (e.type === 'income' ? '+' : '') + yen(e.amount) + '</span></button>';
+          '<span class="a' + (e.type !== 'expense' ? ' inc' : '') + '">' + (e.type !== 'expense' ? '+' : '') + yen(e.amount) + '</span></button>';
         if (S.sel === e.id){
-          html += '<div class="acts"><button class="del" data-del="' + e.id + '">この記録を削除</button><button data-act="close">やめる</button></div>';
+          html += '<div class="acts"><button data-edit="' + e.id + '">編集</button><button class="del" data-del="' + e.id + '">削除</button><button data-act="close">やめる</button></div>';
         }
       });
       html += '</div></div>';
@@ -243,11 +257,12 @@ nav button.on{color:var(--accent);font-weight:700;box-shadow:inset 0 3px 0 var(-
     if (!list.length){
       return html + '<div class="empty-s">この月の記録はまだありません。<br>「入力」タブから追加できます。</div>';
     }
-    var exp = sum(list, 'expense'), inc = sum(list, 'income'), bal = inc - exp;
+    var exp = sum(list, 'expense'), inc = sum(list, 'income'), side = sum(list, 'side'), bal = inc + side - exp;
     html += '<div class="tot">' +
       '<div class="box"><div class="k">支出</div><div class="v">' + yen(exp) + '</div></div>' +
       '<div class="box"><div class="k">収入</div><div class="v inc">' + yen(inc) + '</div></div>' +
-      '<div class="box wide"><div class="k">収支</div><div class="v' + (bal >= 0 ? ' inc' : '') + '">' + (bal >= 0 ? '+' : '−') + yen(Math.abs(bal)) + '</div></div>' +
+      '<div class="box"><div class="k">副業収入</div><div class="v inc">' + yen(side) + '</div></div>' +
+      '<div class="box"><div class="k">収支（副業込み）</div><div class="v' + (bal >= 0 ? ' inc' : '') + '">' + (bal >= 0 ? '+' : '−') + yen(Math.abs(bal)) + '</div></div>' +
     '</div>';
     if (exp > 0){
       var by = {};
@@ -264,6 +279,12 @@ nav button.on{color:var(--accent);font-weight:700;box-shadow:inset 0 3px 0 var(-
       list.forEach(function(e){ if (e.type === 'income') bi[e.cat] = (bi[e.cat] || 0) + e.amount; });
       html += '<h3 class="sec-t" style="margin-top:8px">収入の内訳</h3><div class="inc-list">' +
         Object.keys(bi).map(function(k){ return '<div><span>' + esc(k) + '</span><span>' + yen(bi[k]) + '</span></div>'; }).join('') + '</div>';
+    }
+    if (side > 0){
+      var bs = {};
+      list.forEach(function(e){ if (e.type === 'side') bs[e.cat] = (bs[e.cat] || 0) + e.amount; });
+      html += '<h3 class="sec-t" style="margin-top:8px">副業収入の内訳</h3><div class="inc-list">' +
+        Object.keys(bs).map(function(k){ return '<div><span>' + esc(k) + '</span><span>' + yen(bs[k]) + '</span></div>'; }).join('') + '</div>';
     }
     return html;
   }
@@ -285,9 +306,42 @@ nav button.on{color:var(--accent);font-weight:700;box-shadow:inset 0 3px 0 var(-
     toastTimer = setTimeout(function(){ t.className = ''; }, 4500);
   }
 
+  function resetForm(){
+    S.editId = null; S.amount = ''; S.memo = ''; S.date = todayStr();
+  }
+
+  function startEdit(id){
+    var e = S.entries.filter(function(x){ return x.id === id; })[0];
+    if (!e) return;
+    S.editId = e.id;
+    S.type = e.type; S.cat = e.cat; S.amount = String(e.amount); S.memo = e.memo || ''; S.date = e.date;
+    S.sel = null; S.tab = 'input';
+    render();
+    window.scrollTo(0, 0);
+  }
+
   function record(){
     var amt = parseInt(S.amount, 10) || 0;
     if (!amt) return;
+    if (S.editId){
+      var t = S.entries.filter(function(x){ return x.id === S.editId; })[0];
+      if (t){
+        t.date = S.date || todayStr();
+        t.type = S.type;
+        t.cat = S.cat;
+        t.amount = amt;
+        t.memo = S.memo.trim();
+        save();
+        S.month = t.date.slice(0, 7);
+        S.tab = 'history';
+        S.sel = null;
+        resetForm();
+        render();
+        showToast('<span>更新しました　' + esc(t.cat) + ' ' + yen(t.amount) + '</span>');
+        return;
+      }
+      resetForm();
+    }
     var e = {
       id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
       date: S.date || todayStr(),
@@ -310,7 +364,7 @@ nav button.on{color:var(--accent);font-weight:700;box-shadow:inset 0 3px 0 var(-
     if (!el) return;
     var d = el.dataset;
 
-    if (d.tab){ S.tab = d.tab; S.sel = null; if (d.tab !== 'input') S.month = S.month || curMonth(); render(); return; }
+    if (d.tab){ if (S.editId && d.tab !== 'input') resetForm(); S.tab = d.tab; S.sel = null; if (d.tab !== 'input') S.month = S.month || curMonth(); render(); return; }
     if (d.type){ S.type = d.type; S.cat = CATS[d.type][0]; render(); return; }
     if (d.cat){ S.cat = d.cat; render(); return; }
     if (d.k){
@@ -324,6 +378,8 @@ nav button.on{color:var(--accent);font-weight:700;box-shadow:inset 0 3px 0 var(-
       render(); return;
     }
     if (d.sel){ S.sel = (S.sel === d.sel) ? null : d.sel; render(); return; }
+    if (d.edit){ startEdit(d.edit); return; }
+    if (d.act === 'cancel-edit'){ resetForm(); S.tab = 'history'; render(); return; }
     if (d.del){
       S.entries = S.entries.filter(function(e){ return e.id !== d.del; });
       S.sel = null; save(); render(); return;
@@ -335,6 +391,7 @@ nav button.on{color:var(--accent);font-weight:700;box-shadow:inset 0 3px 0 var(-
     if (d.act === 'undo'){
       if (lastId){
         S.entries = S.entries.filter(function(e){ return e.id !== lastId; });
+        if (S.editId === lastId) resetForm();
         lastId = null; save(); render();
       }
       document.getElementById('toast').className = '';
